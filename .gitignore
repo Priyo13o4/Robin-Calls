@@ -1,0 +1,110 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+!.env.example
+
+# Local compose overrides. Auto-loaded by `docker compose` with no -f flag, so
+# this is where local-only settings (AGENT_ENV=development, a dev model key)
+# live without touching the committed topology. scripts/deploy-remote.sh passes
+# `-f docker-compose.yml` explicitly, which disables override auto-loading —
+# so nothing here can reach the VPS even if the file were copied there.
+docker-compose.override.yml
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+claude-session
+# Claude Code local permissions (machine-specific; launch.json is shared)
+.claude/settings.local.json
+
+# Heavy source PNGs replaced by webp/glb — kept locally, not deployed
+original-assets/
+
+# self-hosted secrets — real SCRAM hashes, never the .example template
+docker/pgbouncer/userlist.txt
+docker/pgbouncer-index/userlist.txt
+docker/cloudflared/config.yml
+
+# Postgres bind-mount default location (docker-compose.yml POSTGRES_DATA_DIR) —
+# the actual database files, never belongs in git regardless of where it's pointed
+/data/
+
+# `drizzle-kit pull` scratch output. The tracked runtime schema lives at
+# lib/db/schema.ts; existing supabase/migrations SQL remains the DDL history.
+/drizzle/
+# Added by code-review-graph
+.code-review-graph/
+
+# Local-dev-only Goldsky override (loopback-publishes postgres-index) — never commit
+docker-compose.goldsky.local.yml
+
+# Python — services/agent
+.venv/
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Investor overview source + build (local-only, not versioned)
+docs/investor-overview/
+
+# Guide build artifacts (renders, video/webp/gif exports) — local-only, not versioned
+public/guides/
+
+# Foundry (contracts/). `lib/` here is forge dependencies, NOT the repo's own TS lib/ —
+# the leading slash is load-bearing. Versions are pinned in contracts/README.md's
+# Setup section, since `--no-git` installs leave no submodule record.
+/contracts/lib/
+/contracts/out/
+/contracts/cache/
+/contracts/broadcast/
+/contracts/foundry.lock
+
+# Wallet-scrape scratch — keys/phrases NEVER commit
+scrape-wallets/
+
+# Next dev-server scratch log. Was tracked once; it carries the LAN IP, a PID
+# and the local absolute path.
+next-dev.log
+
+# Local pool discovery snapshots move to production through a one-time transfer,
+# not through the application repository or Docker build context.
+/output/swap-pools-backfill/*.ndjson
+/output/swap-pools-backfill/run.log
+/output/swap-pools-backfill/checkpoint.json

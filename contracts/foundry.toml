@@ -1,0 +1,52 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+test = "test"
+script = "script"
+
+# Exact compiler versions remain pinned per contract family. The sale uses
+# 0.8.34; existing token/router builds retain 0.8.28. Shared test mocks accept both.
+auto_detect_solc = true
+additional_compiler_profiles = [{ name = "sale", optimizer_runs = 200 }]
+compilation_restrictions = [
+    { paths = "src/token-sale/**", version = "=0.8.34", optimizer_runs = 200 },
+    { paths = "test/token-sale/**", version = "=0.8.34", optimizer_runs = 200 },
+    { paths = "src/token/**", version = "=0.8.28" },
+    { paths = "test/token/**", version = "=0.8.28" },
+    { paths = "src/swap-router/**", version = "=0.8.28" },
+    { paths = "src/shared/**", version = "=0.8.28" },
+]
+optimizer = true
+optimizer_runs = 1_000_000
+
+# Cancun, established by execution rather than by version number. Two earlier guesses
+# were wrong and each failed the same way — REVM answering NotActivated, which reads
+# like a broken contract and is really the fork's own EVM spec refusing an opcode:
+#   paris    rejected live 4663 TOKENS, whose runtime uses PUSH0 (one begins 0x5f).
+#   shanghai rejected UNIVERSAL ROUTER itself, which uses Cancun transient storage.
+# The proof that the CHAIN allows it, not just that UR needs it: Universal Router is
+# the `sender` on real V3 Swap events on 4663 (37 on the deepest WETH pool alone), so
+# Cancun bytecode demonstrably executes here. `ArbSys.arbOSVersion()` answers 116.
+evm_version = "cancun"
+
+via_ir = false
+bytecode_hash = "none"
+cbor_metadata = false
+
+fs_permissions = [{ access = "read", path = "./out" }, { access = "read", path = "./test/fixtures" }]
+
+# Adversarial proof-of-concept suite (contracts/proof). Kept out of the default
+# run so `forge test` stays the invariant suite; run with FOUNDRY_PROFILE=proof.
+[profile.proof]
+test = "proof"
+
+[fmt]
+line_length = 110
+tab_width = 4
+bracket_spacing = false
+int_types = "long"
+
+[rpc_endpoints]
+robinhood = "${ROBINHOOD_RPC_URL}"
+robinhood_testnet = "${ROBINHOOD_TESTNET_RPC_URL}"

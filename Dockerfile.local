@@ -1,0 +1,11 @@
+# Local development image. Source is mounted by docker-compose.local.yml;
+# dependencies are installed into a Docker-managed volume on first start.
+FROM node:22-bookworm-slim
+
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+
+EXPOSE 3000
+ENV HOSTNAME=0.0.0.0
+CMD ["npm", "run", "dev"]

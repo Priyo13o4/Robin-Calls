@@ -1,0 +1,6 @@
+# Kept only as a migration note. Compose uses a remotely managed Cloudflare
+# Tunnel and does not load this file.
+#
+# In Cloudflare Zero Trust → Networks → Tunnels → <tunnel> → Public Hostnames,
+# create the hostname and set its Service to HTTP `http://nginx:80`.
+# The connector token belongs in CLOUDFLARE_TUNNEL_TOKEN in the environment.

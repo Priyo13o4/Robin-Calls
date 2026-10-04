@@ -1,0 +1,80 @@
+[build-system]
+# Explicit, not inferred. Without it pip falls back to a legacy setuptools
+# path whose behaviour differs by pip version — one more thing that can make
+# two builds of the same commit disagree.
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "robincalls-agent"
+version = "1.0.0"
+description = "RobinCalls AI plane — MCP tools, the Robin Knight chat surface, and the audit capability classifier"
+requires-python = ">=3.12"
+
+# ── Bounds, not floors ──────────────────────────────────────────────────────
+#
+# These were open-ended (`>=`) and quietly drifted: `mypy>=1.19` was resolving
+# to 2.3.0 and `pytest>=8.4` to 9.1.1 — two major versions past anything anyone
+# had reviewed. The consequences are both bad and both silent-ish: CI can go
+# red on a morning when nothing changed, and two builds of the same commit
+# produce different images.
+#
+# So every entry is capped at the next major (or minor, for 0.x tools where a
+# minor IS the major). Lower bounds name the version actually exercised. A
+# bump is now a one-line diff someone decided to make.
+#
+# This is a compromise, not a lockfile: transitive dependencies are still
+# unpinned. If build-for-build reproducibility ever matters more than it does
+# now, generate a real lock and install with `--require-hashes`.
+dependencies = [
+  "fastapi>=0.141,<0.142",
+  "uvicorn[standard]>=0.52,<0.53",
+  "httpx>=0.28,<0.29",
+  "pydantic>=2.13,<3",
+  "pydantic-settings>=2.14,<3",
+  # Lazily imported: the MCP surface runs without it, so a container that only
+  # serves tools never needs a model configured.
+  "anthropic>=0.120,<0.121",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=9.1,<10",
+  "pytest-asyncio>=1.4,<2",
+  # A linter's minor releases change what is an error, so this cap is the
+  # tightest of the set: a ruff bump should be a deliberate PR, not a Tuesday.
+  "ruff>=0.16,<0.17",
+  "mypy>=2.3,<3",
+]
+
+[tool.setuptools]
+# Explicit, because setuptools' auto-discovery refuses a flat layout with more
+# than one top-level package: adding ANY new directory here (a `scripts/`, a
+# `migrations/`) made `pip install -e` fail with "Multiple top-level packages
+# discovered", an error with nothing to do with what you changed. `tests` only
+# stayed invisible because it is on setuptools' built-in exclude list.
+packages = ["app", "app.llm"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_ignores = true
+warn_redundant_casts = true
+# Not strict: this is a thin service whose interesting types come from httpx
+# and the Anthropic SDK, and chasing full annotations across those seams would
+# add ceremony without catching the failures this system actually has.
+disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = ["anthropic.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

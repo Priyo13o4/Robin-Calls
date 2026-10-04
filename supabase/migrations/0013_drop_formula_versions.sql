@@ -1,0 +1,31 @@
+-- ─────────────────────────────────────────────────────────────
+-- 0013 — drop `formula_versions`.
+--
+-- WHY: the table was meant to be the published history of the scoring formula
+-- (0001 seeded v1.0, 0005 seeded v1.1). Nothing has ever read it. /methodology
+-- renders the formula from FORMULA_CHANGELOG + WEIGHTED_CHECKS in
+-- lib/config/formula.ts, which is the file the scanner actually scores from —
+-- so the code is the single source of truth, and the table is a second,
+-- unenforced copy that drifted immediately: it stopped at 1.1 while the engine
+-- shipped 1.2, 1.3, 1.4, 1.5, 1.6 and now 1.7.
+--
+-- Keeping it would mean seeding a row on every formula bump forever, to serve a
+-- reader that doesn't exist. Worse, the drift is not repairable: the historical
+-- weights for 1.2–1.6 no longer exist anywhere — formula.ts carries only the
+-- CURRENT weights plus prose changelog entries — so any backfill would be
+-- invented numbers wearing a version label. A table that cannot be made true is
+-- worse than no table.
+--
+-- WHAT THIS COSTS: `verdicts.formula_version` still stamps every receipt (that
+-- column stays), but interpreting a stamp now requires the repo at that version
+-- rather than a database export alone. Accepted deliberately — the git history
+-- of lib/config/formula.ts is the real, tamper-evident record of what each
+-- version meant, and unlike the table it cannot silently disagree with the code
+-- that produced the score.
+--
+-- SAFE TO RUN ANY TIME: no code path references this table (verified by grep
+-- across app/, lib/ and tests/), and no foreign key points at it — `verdicts`
+-- stores formula_version as free text, never as a reference.
+-- ─────────────────────────────────────────────────────────────
+
+drop table if exists public.formula_versions;

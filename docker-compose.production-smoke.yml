@@ -1,0 +1,108 @@
+# Local production-mode smoke test: retains the base stack's Dockerfile.prod,
+# but publishes nginx on loopback and uses the local dev hostname/config.
+#
+# Both images are BUILT here rather than pulled. The base stack names GHCR tags
+# because that is what the VPS must do — it has neither the source tree nor the
+# headroom to compile (`docker-compose.yml` builds nothing on purpose). Locally
+# the opposite is true and the pulled tag is actively misleading: `:latest` is
+# whatever last merged to main, so a smoke test of your own branch would run
+# somebody else's agent against your own app and look like it passed.
+services:
+  # Opt-in only: `--profile sequencer`. The app no longer waits for it.
+  relay:
+    profiles: ["sequencer"]
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      # NEXT_PUBLIC_* is baked in at `next build` time, inside this build —
+      # env_file below only reaches the RUNTIME container, too late for the
+      # client bundle. `${VAR}` here reads from `--env-file` on the compose
+      # CLI (docs/wallet-integration/WAYS-OF-WORK.md §8), so this stays "the
+      # local env" the same way runtime already is. Add a line here the same
+      # day a new NEXT_PUBLIC_ read is added (Dockerfile.prod's own comment).
+      args:
+        NEXT_PUBLIC_ENABLE_WALLET: ${NEXT_PUBLIC_ENABLE_WALLET}
+        NEXT_PUBLIC_ENABLE_WALLET_TESTING: ${NEXT_PUBLIC_ENABLE_WALLET_TESTING}
+        NEXT_PUBLIC_REOWN_PROJECT_ID: ${NEXT_PUBLIC_REOWN_PROJECT_ID}
+        NEXT_PUBLIC_CDN_URL: ${NEXT_PUBLIC_CDN_URL}
+        NEXT_PUBLIC_RPC_URL: ${NEXT_PUBLIC_RPC_URL}
+        NEXT_PUBLIC_SITE_URL: https://dev.robincalls.com
+        NEXT_PUBLIC_ALLOW_TESTNET_CHAIN: ${NEXT_PUBLIC_ALLOW_TESTNET_CHAIN}
+        NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL: ${NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL}
+        NEXT_PUBLIC_ROBINHOOD_TESTNET_EXPLORER_URL: ${NEXT_PUBLIC_ROBINHOOD_TESTNET_EXPLORER_URL}
+    # Build, never pull — and this is why it is declared rather than left to a
+    # flag on the command line.
+    #
+    # The base stack sets `image: ghcr.io/…:${IMAGE_TAG:-latest}` with no build
+    # block, so that name is what this locally-built image gets tagged as. Under
+    # the default `missing` policy, a `docker compose up` that finds no local
+    # image with that tag resolves it the only other way it can — by pulling
+    # `:latest` from GHCR — and then starts a container that looks exactly like
+    # a successful local build. Same name, same `docker ps` row, somebody else's
+    # code. `build` makes the source of the image a property of the stack
+    # instead of something you have to remember to type.
+    pull_policy: build
+    # !override, not a merge: a merged list also loaded .env.production (12 prod-only keys leaked).
+    env_file: !override
+      - .env.local
+    depends_on: !override
+      pgbouncer:
+        condition: service_started
+      valkey:
+        condition: service_healthy
+    environment:
+      NEXT_PUBLIC_SITE_URL: https://dev.robincalls.com
+      BETTER_AUTH_URL: https://dev.robincalls.com
+      # Local never ingests unless asked. Sequencer defaults ON in code, so default it OFF here;
+      # SMOKE_SEQUENCER_INGEST=true with `--profile sequencer` runs the relay and its runtime.
+      ENABLE_SEQUENCER_INGEST: ${SMOKE_SEQUENCER_INGEST:-false}
+      ENABLE_LAUNCH_INGEST: "false"
+      ENABLE_ANALYTICS_INGEST: "false"
+      ENABLE_WANTED_INGESTION: "false"
+      ENABLE_SLOW_RUG_MONITOR: "false"
+      ENABLE_CURVE_TRACKER: "false"
+      ENABLE_LAUNCH_RETENTION: "false"
+      ENABLE_CURVE_RETENTION: "false"
+      ENABLE_V4_POOL_BACKFILL: "false"
+      # Mirror prod's launch registry over the signed /api/sync/v1 (lib/sync/pull.ts) instead of
+      # spending RPC on it. Needs PROD_SYNC_URL + PROD_SYNC_SIGNING_KEY in .env.local. SMOKE_PROD_SYNC=false opts out.
+      PROD_SYNC_PULL: ${SMOKE_PROD_SYNC:-true}
+
+  # Context is services/agent, not the repo root — the same split CI uses. The
+  # agent image needs none of the Next.js tree, and a root context would rebuild
+  # it on every unrelated frontend edit.
+  #
+  # NOTE the startup order this implies. The agent's boot gate calls Next for
+  # get_methodology and refuses to serve if that read fails, so `app` must be up
+  # and carrying /api/internal/v1/read before the agent starts. `depends_on` in
+  # the base stack orders the START, not the readiness — if you rebuild only the
+  # agent against a stale app, expect the readiness probe to fail and mean it.
+  agent:
+    build:
+      context: services/agent
+      dockerfile: Dockerfile
+    # See `app` above. The agent is the more dangerous of the two to pull by
+    # accident: `:latest` is whatever last merged to main, so the stack would
+    # come up healthy and pass its readiness probe while testing your app
+    # against a different branch's agent.
+    pull_policy: build
+    environment:
+      # Development, so settings.py does not apply its production-only
+      # refusals — the point of this stack is to exercise the real image
+      # locally, not to reproduce prod's guard rails.
+      AGENT_ENV: development
+
+  nginx:
+    ports:
+      - "127.0.0.1:3000:80"
+
+  # Loopback only, so `next dev` on the Mac reaches the pooler (/etc/hosts maps pgbouncer
+  # to 127.0.0.1). Never a bare "6432:6432": that binds 0.0.0.0.
+  pgbouncer:
+    ports:
+      - "127.0.0.1:6432:6432"
+
+  cloudflared:
+    restart: "no"

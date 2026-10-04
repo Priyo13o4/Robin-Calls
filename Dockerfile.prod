@@ -1,0 +1,88 @@
+# ─────────────────────────────────────────────────────────────
+# RobinCalls web app — multi-stage build for the standalone Next.js output.
+# ─────────────────────────────────────────────────────────────
+
+FROM node:22-bookworm-slim AS deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci
+
+FROM node:22-bookworm-slim AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+# Build-time env: only NEXT_PUBLIC_* values are actually baked into the
+# client bundle; everything else is read at request time from the runtime
+# container's env (see docker-compose.yml `environment:`). Pass the public
+# ones as build args if they differ between build and run.
+#
+# The ARG/ENV pairs below are that — every NEXT_PUBLIC_* the repo reads
+# (`grep -rn NEXT_PUBLIC_ lib/ app/`). `.dockerignore` excludes all `.env*`
+# from the build context on purpose (no secret leaks into an image layer),
+# so these can ONLY arrive as `--build-arg` / compose `build.args` — an
+# unlisted var bakes in as `undefined`, silently, for every request that
+# image ever serves. Unset is a safe no-op (each reader has a fallback);
+# add a line here the day you add a new NEXT_PUBLIC_ read, not after.
+ARG NEXT_PUBLIC_ENABLE_WALLET
+ARG NEXT_PUBLIC_ENABLE_WALLET_TESTING
+ARG NEXT_PUBLIC_REOWN_PROJECT_ID
+ARG NEXT_PUBLIC_CDN_URL
+ARG NEXT_PUBLIC_RPC_URL
+ARG NEXT_PUBLIC_SITE_URL
+ARG NEXT_PUBLIC_ALLOW_TESTNET_CHAIN
+ARG NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL
+ARG NEXT_PUBLIC_ROBINHOOD_TESTNET_EXPLORER_URL
+ENV NEXT_PUBLIC_ENABLE_WALLET=$NEXT_PUBLIC_ENABLE_WALLET
+ENV NEXT_PUBLIC_ENABLE_WALLET_TESTING=$NEXT_PUBLIC_ENABLE_WALLET_TESTING
+ENV NEXT_PUBLIC_REOWN_PROJECT_ID=$NEXT_PUBLIC_REOWN_PROJECT_ID
+ENV NEXT_PUBLIC_CDN_URL=$NEXT_PUBLIC_CDN_URL
+ENV NEXT_PUBLIC_RPC_URL=$NEXT_PUBLIC_RPC_URL
+ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
+ENV NEXT_PUBLIC_ALLOW_TESTNET_CHAIN=$NEXT_PUBLIC_ALLOW_TESTNET_CHAIN
+ENV NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL=$NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL
+ENV NEXT_PUBLIC_ROBINHOOD_TESTNET_EXPLORER_URL=$NEXT_PUBLIC_ROBINHOOD_TESTNET_EXPLORER_URL
+#
+# BETTER_AUTH_SECRET here is a THROWAWAY value satisfying Better Auth's own
+# "don't use the default secret" check during `next build`'s static page-data
+# collection — it is never used to sign anything real. The runtime container
+# gets the actual secret via docker-compose's env_file, which always wins at
+# request time; nothing below is baked into the image or the client bundle.
+ENV BETTER_AUTH_SECRET=build-time-placeholder-not-the-real-secret
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_PRIVATE_BUILD_WORKER_COUNT=1
+ENV NODE_OPTIONS="--max-old-space-size=2048"
+RUN --mount=type=cache,target=/app/.next/cache npm run build
+
+# ── Runtime — standalone output only, no full node_modules ──
+FROM node:22-bookworm-slim AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
+
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+# Staging path, NOT .next/static. In production that directory is a persistent
+# volume holding the last few builds' chunks, and the entrypoint merges this
+# build into it — a container swap used to delete every asset the previous
+# build had emitted, which 404'd any tab that was already open.
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static-build
+COPY docker/app/entrypoint.sh /usr/local/bin/entrypoint.sh
+
+# The mount point must exist AND be owned by nextjs BEFORE the volume is
+# attached: Docker seeds a new named volume from the image's content and
+# ownership at that path, so leaving it absent gets a root-owned empty
+# directory that the unprivileged runtime user cannot write its own assets to.
+RUN mkdir -p /app/.next/static \
+ && chown nextjs:nodejs /app/.next/static \
+ && chmod +x /usr/local/bin/entrypoint.sh
+
+USER nextjs
+EXPOSE 3000
+ENV PORT=3000 HOSTNAME=0.0.0.0
+
+# The archive merge runs before the server, on every start. Without a volume
+# mounted (a bare `docker run`, or the local smoke stack before this change)
+# it simply populates .next/static from the staging copy, so the image still
+# works standalone.
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["node", "server.js"]

@@ -1,0 +1,110 @@
+# Local full-stack override. Use with the production-shaped base stack:
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up --build
+#
+# nginx is published only on loopback. cloudflared, when included, reaches it
+# over Docker's internal network as http://nginx:80.
+services:
+  postgres:
+    restart: "no"
+
+  pgbouncer:
+    restart: "no"
+    # Loopback-only, so local tooling (scripts/create-admin.ts, psql) can
+    # reach the pooler without the base stack ever publishing it. The
+    # 127.0.0.1 prefix is load-bearing — "6432:6432" would bind 0.0.0.0.
+    ports:
+      - "127.0.0.1:6432:6432"
+
+  valkey:
+    restart: "no"
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  # Opt-in only: `--profile sequencer`. The app no longer waits for it.
+  relay:
+    profiles: ["sequencer"]
+    restart: "no"
+    ports:
+      - "127.0.0.1:9642:9642"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    restart: "no"
+    # !override, not a merge: a merged list also loaded .env.production (12 prod-only keys leaked).
+    env_file: !override
+      - .env.local
+    depends_on: !override
+      pgbouncer:
+        condition: service_started
+      valkey:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://robincalls_app:${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env.local}@pgbouncer:6432/robincalls
+      REDIS_URL: redis://valkey:6379
+      NEXT_PUBLIC_SITE_URL: https://dev.robincalls.com
+      BETTER_AUTH_URL: https://dev.robincalls.com
+      WS_FEED_URL: ws://relay:9642
+      # Local never ingests. Sequencer defaults ON unless disabled, so say so explicitly.
+      ENABLE_SEQUENCER_INGEST: "false"
+      ENABLE_LAUNCH_INGEST: "false"
+      ENABLE_ANALYTICS_INGEST: "false"
+      ENABLE_WANTED_INGESTION: "false"
+      ENABLE_SLOW_RUG_MONITOR: "false"
+      ENABLE_CURVE_TRACKER: "false"
+      ENABLE_LAUNCH_RETENTION: "false"
+      ENABLE_CURVE_RETENTION: "false"
+      ENABLE_V4_POOL_BACKFILL: "false"
+    volumes:
+      - ./:/app
+      - local-node-modules:/app/node_modules
+      - local-next-cache:/app/.next
+    command: sh -c 'test -x node_modules/.bin/next || npm ci && npm run dev'
+
+  # Built from source and hot-reloading, the Python counterpart to `npm run dev`
+  # above. The base stack pulls a GHCR tag because the VPS must; locally that tag
+  # is whatever last merged to main, so without this override you would be
+  # editing services/agent/ and testing somebody else's build.
+  #
+  # `app/` is bind-mounted over the image's copy and uvicorn watches it, so an
+  # edit to a persona prompt, a tools.toml entry or a dispatcher restarts the
+  # worker in about a second instead of costing a rebuild. Read-only: the
+  # container has no business writing back into the repo.
+  #
+  # tools.toml and personas.toml live inside app/, so they reload too — but the
+  # registry memoizes on first use (`@lru_cache` in registry.py), and it is the
+  # WORKER restart that clears it, not the file write. A tools.toml edit that
+  # appears to do nothing is worth checking against the reload log.
+  agent:
+    build:
+      context: services/agent
+      dockerfile: Dockerfile
+    restart: "no"
+    environment:
+      AGENT_ENV: development
+      LOG_LEVEL: debug
+    volumes:
+      - ./services/agent/app:/srv/app:ro
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --reload
+      - --reload-dir
+      - /srv/app
+
+  nginx:
+    restart: "no"
+    ports:
+      - "127.0.0.1:3000:80"
+
+  cloudflared:
+    restart: "no"
+
+volumes:
+  local-node-modules:
+  local-next-cache:

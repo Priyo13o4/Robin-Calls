@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1025" height="250" viewBox="0 0 1025 250">
+  <!--
+    Lanyard band webbing. Replaces React Bits' Atom-logo strap. This file is the
+    SOURCE; `band-robincalls.png` beside it is what actually ships — see the
+    README for why, and for the one command that regenerates it.
+
+    Same 1025x250 as the original so it tiles identically (the material repeats
+    it 4x along the band).
+
+    ORIENTATION. The texture's X axis (1025) runs ALONG the strap and its Y axis
+    (250) runs ACROSS it, so type set normally here reads down the hanging band —
+    which is what a lanyard looks like. An earlier version rotated the wordmark
+    90deg on the theory that it should read horizontally; that laid a ~490px
+    string along the 250px axis, so it ran clean off the strap and only the
+    middle three letters were ever on it. Set type along X, and size it against
+    250, not 1025.
+
+    One wordmark per tile, not two: at a size legible on a band this thin a
+    second copy does not fit, and the material repeats the tile four times.
+
+    Georgia is the Cinzel fallback the app already declares — webfonts do not
+    load into a rasteriser or into an <img>-rendered SVG, so naming Cinzel here
+    would silently fall back anyway.
+  -->
+  <rect width="1025" height="250" fill="#0a0a0a"/>
+
+  <!-- Woven edge stripes, the way real polyester webbing catches light. -->
+  <rect x="0" y="16" width="1025" height="2" fill="#ededea" opacity="0.16"/>
+  <rect x="0" y="232" width="1025" height="2" fill="#ededea" opacity="0.16"/>
+  <rect x="0" y="27" width="1025" height="1" fill="#ededea" opacity="0.08"/>
+  <rect x="0" y="222" width="1025" height="1" fill="#ededea" opacity="0.08"/>
+
+  <text x="512" y="125" text-anchor="middle" dominant-baseline="central"
+        fill="#ededea" font-family="Georgia, 'Times New Roman', serif"
+        font-weight="700" font-size="96" letter-spacing="14">ROBINCALLS</text>
+
+  <!-- The single lime element (DESIGN.md): a tick at each end of the tile, so
+       the repeat reads as a seam rather than as a join that got missed. -->
+  <rect x="36" y="113" width="8" height="24" fill="#ccff00"/>
+  <rect x="981" y="113" width="8" height="24" fill="#ccff00"/>
+</svg>

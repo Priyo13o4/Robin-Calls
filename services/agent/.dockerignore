@@ -1,0 +1,21 @@
+# The build context is services/agent, so the repo-root .dockerignore does not
+# apply here — without this file a local `docker build` uploads the whole
+# virtualenv (hundreds of MB of platform-specific wheels) as build context, on
+# every build. CI never had it, which is why nobody noticed.
+#
+# Note what is NOT excluded: app/tools.toml, app/personas.toml and
+# app/knowledge/*.md are data the image genuinely needs at runtime. The root
+# .dockerignore excludes `*.md`, and that exclusion must never be copied here.
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# Tests run in CI, not in the image.
+tests/

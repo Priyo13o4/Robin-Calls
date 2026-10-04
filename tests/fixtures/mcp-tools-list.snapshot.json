@@ -1,0 +1,79 @@
+{
+  "capturedAt": "2026-08-02T04:10:47.078Z",
+  "note": "Frozen surface of the retired Next.js MCP server (app/api/mcp/route.ts + lib/mcp/tools.ts). The FastAPI server at services/agent must remain a superset: same tool names, same required inputs, no silently narrowed schema. tests/mcp-parity.test.ts pins this file against services/agent/app/tools.toml.",
+  "serverInfo": {
+    "name": "robincalls",
+    "version": "1.0.0"
+  },
+  "instructions": "RobinCalls is the permanent record of Robinhood Chain (chain id 4663). Use scan_token to get a fresh, hash-chained risk Verdict on any token; get_verdict and lookup_deployer read the persistent record; get_methodology returns the published scoring formula. Scores are deterministic — code, not oracle.",
+  "tools": [
+    {
+      "name": "scan_token",
+      "title": "Scan a token",
+      "description": "Run the full RobinCalls Verdict on a Robinhood Chain token: CRITICAL kill-shot checks, weighted risk checks, and a layered honeypot simulation. Returns the score, tier, per-check results, and (if persistence is on) the hash-chain ledger stamp. Deterministic and reproducible.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "The token contract address on Robinhood Chain (0x + 40 hex)."
+          }
+        },
+        "required": [
+          "address"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_verdict",
+      "title": "Get a recorded verdict",
+      "description": "Look up a previously-issued Verdict from The Ledger by its numeric id. Returns the recorded score, tier, checks, and hash-chain links — proof of what was said and when.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The ledger verdict id."
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "lookup_deployer",
+      "title": "Look up a deployer",
+      "description": "Check a deployer wallet against the RobinCalls persistent record: confirmed rugs, dead launches, and total extracted. This cross-session memory is what stateless scanners cannot provide.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "The deployer wallet address."
+          }
+        },
+        "required": [
+          "address"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_methodology",
+      "title": "Get the scoring methodology",
+      "description": "Return the published, versioned RobinCalls scoring formula: tier bands, CRITICAL kill-shot overrides, and every weighted check with its weight and source. Every score is re-derivable from this.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    }
+  ]
+}

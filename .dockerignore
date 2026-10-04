@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.env*
+!.env.example
+docker/pgbouncer/userlist.txt
+/data
+original-assets
+coverage
+*.md
+!content/investor-overview.md
+# Solidity/Foundry — never part of the Next.js image
+contracts
+# Local-only wallet-recovery scratch — keys/phrases can never reach an image
+scrape-wallets
+# Raw video/guide renders — scratch assets never served by the app
+public/guides

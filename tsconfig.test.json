@@ -1,0 +1,10 @@
+{
+  "//": [
+    "The tree tsconfig.json excludes so `next dev` stops re-checking it.",
+    "`npm run typecheck` runs BOTH configs, so coverage is unchanged — this",
+    "file exists only to move the work off the dev server's hot path."
+  ],
+  "extends": "./tsconfig.json",
+  "include": ["tests/**/*.ts", "scripts/**/*.ts", "scrape-wallets/**/*.ts"],
+  "exclude": ["node_modules"]
+}

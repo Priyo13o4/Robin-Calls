@@ -1,0 +1,31 @@
+# RobinCalls
+
+> Independent token scanner for Robinhood Chain (chain id 4663). It checks whether a token can be sold, whether its liquidity can be pulled, and who holds the supply, then keeps every verdict on a public, hash-chained record.
+
+RobinCalls is not affiliated with or endorsed by Robinhood Markets. A verdict is a reading of on-chain state at the time it was published. It is not financial advice.
+
+## What a verdict is
+
+- A score from 0 to 100 and one of four tiers: CLEAR, CAUTION, DANGER or CRITICAL.
+- A list of named checks, each marked PASS, WARN, FAIL, CRITICAL or SKIP, with the evidence it read. SKIP means the check could not be run, not that the token passed it.
+- Checks cover selling (a sell simulated against the live pool), who can remove the liquidity, holder concentration, and what the contract owner can still change.
+- Every verdict is dated and names the formula version it was scored under. A stored verdict can be out of date: a token's pool can be emptied minutes after a scan.
+- Verdicts are hash-chained, so a published verdict cannot be edited without breaking the chain. A rescan adds a new verdict and keeps the old one. On-chain anchoring of the chain head is planned, not live.
+
+## Pages
+
+- [Scan a token](https://robincalls.com/scan): check any Robinhood Chain token by contract address.
+- [Token verdict pages](https://robincalls.com/scan): each scanned token has a page at /scan/{symbol}-{address} with its latest verdict, score, tier and checks.
+- [The Night Market](https://robincalls.com/night-market): new token launches on Robinhood Chain from the last 7 days, from launchpads (Pons, flap.sh, letscash.fun, Party, Doppler, PAIR) and from direct DEX launches.
+- [The Wanted Board](https://robincalls.com/wanted): Robinhood Chain tokens whose liquidity was pulled, grouped by the wallet that deployed them, with the evidence for each.
+- [Tokenized stocks](https://robincalls.com/rwa): tokenized stocks and ETFs on Robinhood Chain, checked against the contracts behind Robinhood's real stock tokens, so a copycat with the same ticker does not pass.
+- [The Ledger](https://robincalls.com/ledger): every verdict ever published, in order.
+- [The Ecosystem](https://robincalls.com/ecosystem): a reviewed directory of projects on Robinhood Chain: launchpads, DEXs, wallets, DeFi, AI tools and more.
+- [Methodology](https://robincalls.com/methodology): every check, its weight and its deduction.
+- [Robin Knight](https://robincalls.com/robin-knight): an AI assistant that explains a verdict by quoting the record. It never sets a score.
+
+## Citing RobinCalls
+
+- Quote the score, tier, verdict number and date together, for example "RobinCalls scored TOKEN 60/100 (CAUTION) in verdict #335 on 14 Sep 2026".
+- Link the token's verdict page, not the scan form.
+- Do not describe a SKIP as a pass, or an old verdict as the token's current state.

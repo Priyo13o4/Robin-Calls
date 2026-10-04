@@ -1,0 +1,993 @@
+{
+  "_regen": "cd contracts && forge build && cd .. && node scripts/gen-token-sale-abi-fixture.mjs",
+  "generatedFrom": "contracts/out/TokenSale.sol/TokenSale.json + ITokenSale.sol enum SaleState",
+  "sourceFiles": [
+    "contracts/src/token-sale/TokenSale.sol",
+    "contracts/src/token-sale/ITokenSale.sol"
+  ],
+  "sourceHash": "a1f42236ca87cf89df2a2dee804f95a1960144f5d506b56ac0275573031365cb",
+  "saleStateEnum": [
+    "Pending",
+    "Active",
+    "Paused",
+    "Closed",
+    "Abandoned"
+  ],
+  "entries": [
+    {
+      "type": "function",
+      "name": "abandon",
+      "stateMutability": "nonpayable",
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "acceptOwnership",
+      "stateMutability": "nonpayable",
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "allocationOf",
+      "stateMutability": "view",
+      "inputs": [
+        {
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "BPS_DENOMINATOR",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint16"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "BURN_DELAY",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "burnUnclaimed",
+      "stateMutability": "nonpayable",
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "censusSlice",
+      "stateMutability": "view",
+      "inputs": [
+        {
+          "name": "offset",
+          "type": "uint256"
+        },
+        {
+          "name": "count",
+          "type": "uint256"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "wallets",
+          "type": "address[]"
+        },
+        {
+          "name": "amounts",
+          "type": "uint256[]"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "claim",
+      "stateMutability": "nonpayable",
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "claimed",
+      "stateMutability": "view",
+      "inputs": [
+        {
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "claimRefund",
+      "stateMutability": "nonpayable",
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "claimStray",
+      "stateMutability": "nonpayable",
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "close",
+      "stateMutability": "nonpayable",
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "closedAt",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "contribute",
+      "stateMutability": "payable",
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "contributed",
+      "stateMutability": "view",
+      "inputs": [
+        {
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "contributionStep",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "contributorCount",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "contributors",
+      "stateMutability": "view",
+      "inputs": [
+        {
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "address"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "distribute",
+      "stateMutability": "nonpayable",
+      "inputs": [
+        {
+          "name": "count",
+          "type": "uint256"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "processed",
+          "type": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "distributionComplete",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "distributionCursor",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "FEE_ADDRESS_1_BPS",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint16"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "FEE_ADDRESS_2_BPS",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint16"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "FEE_ADDRESS_3_BPS",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint16"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "feeAddress1",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "address"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "feeAddress1Bps",
+      "stateMutability": "pure",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint16"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "feeAddress2",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "address"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "feeAddress2Bps",
+      "stateMutability": "pure",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint16"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "feeAddress3",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "address"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "feeAddress3Bps",
+      "stateMutability": "pure",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint16"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "feeDisabled",
+      "stateMutability": "view",
+      "inputs": [
+        {
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "minInitialContribution",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "owner",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "address"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "pause",
+      "stateMutability": "nonpayable",
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "pendingOwner",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "address"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "proceedsWithdrawn",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "recoverERC20",
+      "stateMutability": "nonpayable",
+      "inputs": [
+        {
+          "name": "erc20",
+          "type": "address"
+        },
+        {
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "REFERRAL_BPS",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint16"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "referralBps",
+      "stateMutability": "pure",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint16"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "referralPotRecipient",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "address"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "refunded",
+      "stateMutability": "view",
+      "inputs": [
+        {
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "renounceOwnership",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "resume",
+      "stateMutability": "nonpayable",
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "setContributionLimits",
+      "stateMutability": "nonpayable",
+      "inputs": [
+        {
+          "name": "minInitialContribution_",
+          "type": "uint256"
+        },
+        {
+          "name": "contributionStep_",
+          "type": "uint256"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "setFeeAddress1",
+      "stateMutability": "nonpayable",
+      "inputs": [
+        {
+          "name": "feeAddress1_",
+          "type": "address"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "setFeeAddress2",
+      "stateMutability": "nonpayable",
+      "inputs": [
+        {
+          "name": "feeAddress2_",
+          "type": "address"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "setFeeAddress3",
+      "stateMutability": "nonpayable",
+      "inputs": [
+        {
+          "name": "feeAddress3_",
+          "type": "address"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "setFeeEnabled",
+      "stateMutability": "nonpayable",
+      "inputs": [
+        {
+          "name": "feeAddressId",
+          "type": "uint8"
+        },
+        {
+          "name": "enabled",
+          "type": "bool"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "setReferralPotRecipient",
+      "stateMutability": "nonpayable",
+      "inputs": [
+        {
+          "name": "recipient",
+          "type": "address"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "start",
+      "stateMutability": "nonpayable",
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "state",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint8"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "strayOf",
+      "stateMutability": "view",
+      "inputs": [
+        {
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "straySwept",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "sweepStray",
+      "stateMutability": "nonpayable",
+      "inputs": [
+        {
+          "name": "to",
+          "type": "address"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "token",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "address"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "tokensForSale",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "totalRaised",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "totalStray",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "transferOwnership",
+      "stateMutability": "nonpayable",
+      "inputs": [
+        {
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "unclaimedBurned",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "withdrawProceeds",
+      "stateMutability": "nonpayable",
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "withdrawUnsoldTokens",
+      "stateMutability": "nonpayable",
+      "inputs": [
+        {
+          "name": "to",
+          "type": "address"
+        }
+      ],
+      "outputs": []
+    }
+  ],
+  "errors": [
+    {
+      "type": "error",
+      "name": "AlreadyBurned",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "AlreadyClaimed",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "AlreadyRefunded",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "BelowMinimumContribution",
+      "inputs": [
+        {
+          "name": "sent",
+          "type": "uint256"
+        },
+        {
+          "name": "minimum",
+          "type": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "BurnTooEarly",
+      "inputs": [
+        {
+          "name": "availableAt",
+          "type": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "CannotRecoverSaleToken",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "EthTransferFailed",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "FeeAddressRequired",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "InvalidContributionLimits",
+      "inputs": [
+        {
+          "name": "minContribution",
+          "type": "uint256"
+        },
+        {
+          "name": "step",
+          "type": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "InvalidFeeAddressId",
+      "inputs": [
+        {
+          "name": "feeAddressId",
+          "type": "uint8"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "NoStray",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "NothingToClaim",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "NothingToRefund",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "NothingToWithdraw",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "NotStepMultiple",
+      "inputs": [
+        {
+          "name": "sent",
+          "type": "uint256"
+        },
+        {
+          "name": "step",
+          "type": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "Overfunded",
+      "inputs": [
+        {
+          "name": "held",
+          "type": "uint256"
+        },
+        {
+          "name": "required",
+          "type": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "OwnableInvalidOwner",
+      "inputs": [
+        {
+          "name": "owner",
+          "type": "address"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "OwnableUnauthorizedAccount",
+      "inputs": [
+        {
+          "name": "account",
+          "type": "address"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "ProceedsAlreadyWithdrawn",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "ReentrancyGuardReentrantCall",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "RenounceOwnershipDisabled",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "SafeERC20FailedOperation",
+      "inputs": [
+        {
+          "name": "token",
+          "type": "address"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "SaleTokensBurned",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "SaleWasNotEmpty",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "StrayAlreadySwept",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "Underfunded",
+      "inputs": [
+        {
+          "name": "held",
+          "type": "uint256"
+        },
+        {
+          "name": "required",
+          "type": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "WrongState",
+      "inputs": [
+        {
+          "name": "current",
+          "type": "uint8"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "ZeroAddress",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "ZeroContribution",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "ZeroTokensForSale",
+      "inputs": []
+    }
+  ]
+}

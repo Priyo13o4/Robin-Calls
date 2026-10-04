@@ -1,0 +1,25 @@
+-- 0050: contract identity + function inventory on the audit artifact.
+--
+-- What it stores: the analysed contract's declared name, whether its source was
+-- actually verified, its compiler, and its callable surface — state-changing
+-- functions from a verified ABI, or the raw dispatched selectors when there is
+-- no ABI to read. Shape: lib/audit/types.ts::ContractIdentity.
+--
+-- Why a column rather than a corner of `capabilities`: that column is an array
+-- of CapabilityFinding and lib/data/audit.ts maps it as one. Identity is a
+-- different kind of fact about the same bytecode, and it is what turns the
+-- classifier's empty `[]` from a shrug into a sentence — "no capabilities
+-- found" reads as an all-clear, while "HoodBurnLocker, two state-changing
+-- functions, neither a withdrawal" is an actual answer.
+--
+-- Keyed the same way the rest of the artifact is (chain_id, runtime_code_hash,
+-- rule_version): same bytecode implies same source implies same identity.
+--
+-- Additive and defaulted so existing rows stay readable. They will not in fact
+-- be read: AUDIT_RULE_VERSION moves to audit-v4 in the same change, so every
+-- artifact is re-derived on next scan rather than served with an empty
+-- identity. `decodeIdentity` still treats a `{}` as "not established" — a
+-- missing key must never decode to `sourceVerified: false`, which would be a
+-- claim about the contract manufactured out of a default.
+alter table public.contract_audit_artifact
+  add column if not exists identity jsonb not null default '{}'::jsonb;

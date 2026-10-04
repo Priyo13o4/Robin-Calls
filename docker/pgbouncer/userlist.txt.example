@@ -1,0 +1,10 @@
+; Copy to userlist.txt (gitignored) and fill in real values — never commit
+; the real file.
+;
+; Generate the SCRAM hash with psql against the running postgres container:
+;   docker compose exec postgres psql -U postgres -c \
+;     "SELECT rolname, rolpassword FROM pg_authid WHERE rolname = 'robincalls_app';"
+; Paste the rolpassword value (starts with SCRAM-SHA-256$) as-is — pgbouncer
+; reads it directly, no re-hashing needed.
+"robincalls_app" "SCRAM-SHA-256$<iterations>:<salt>$<StoredKey>:<ServerKey>"
+"pgbouncer_admin" "SCRAM-SHA-256$<iterations>:<salt>$<StoredKey>:<ServerKey>"

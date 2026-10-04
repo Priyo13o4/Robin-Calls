@@ -1,0 +1,145 @@
+name: Build and Push
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  packages: write
+  contents: read
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push web image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.prod
+          push: true
+          platforms: linux/arm64
+          # NEXT_PUBLIC_* is baked in at `next build` time — `.dockerignore`
+          # blocks every `.env*` from this build, so these MUST arrive as
+          # build-args or the client bundle silently ships `undefined`
+          # (Dockerfile.prod's own comment). Repo Variables, not Secrets —
+          # these values end up in the public client bundle regardless, so
+          # encrypting them in transit here buys nothing. Set once in
+          # Settings → Secrets and variables → Actions → Variables; blank is
+          # a safe no-op (each reader has a fallback), not a build failure.
+          build-args: |
+            NEXT_PUBLIC_ENABLE_WALLET=${{ vars.NEXT_PUBLIC_ENABLE_WALLET }}
+            NEXT_PUBLIC_ENABLE_WALLET_TESTING=${{ vars.NEXT_PUBLIC_ENABLE_WALLET_TESTING }}
+            NEXT_PUBLIC_REOWN_PROJECT_ID=${{ vars.NEXT_PUBLIC_REOWN_PROJECT_ID }}
+            NEXT_PUBLIC_CDN_URL=${{ vars.NEXT_PUBLIC_CDN_URL }}
+            NEXT_PUBLIC_RPC_URL=${{ vars.NEXT_PUBLIC_RPC_URL }}
+            NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL }}
+          # NEXT_PUBLIC_ALLOW_TESTNET_CHAIN and the two testnet URLs are
+          # DELIBERATELY ABSENT — do not add them back, and see
+          # tests/testnet-build-lane.test.ts, which fails if you do.
+          #
+          # Production is mainnet by construction, not by an unset variable. The
+          # wire simply does not exist here, so no repo Variable can reach the
+          # client bundle however it is set. That matters because the surface it
+          # would move is /token-sale: a public page taking real money, pointed
+          # at a chain where the sale contract does not exist, rendering fine.
+          #
+          # Testnet reaches the two lanes that need it and no others —
+          # `.env.local` for the dev server, and `--env-file` for the local
+          # smoke stack (docker-compose.production-smoke.yml, which shares this
+          # Dockerfile and keeps the ARG for exactly that reason).
+          tags: |
+            ghcr.io/priyo13o4/robincalls:latest
+            ghcr.io/priyo13o4/robincalls:${{ github.sha }}
+          # One scope per image: unscoped, both share "buildx" and each build overwrote the
+          # other's cache, so neither ever hit (npm ci and a 137 s export ran every push).
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      # Context is services/agent, not the repo root — the agent image needs
+      # none of the Next.js tree, and a root context would invalidate its layer
+      # cache on every unrelated frontend commit.
+      - name: Build and push agent image
+        uses: docker/build-push-action@v5
+        with:
+          context: services/agent
+          file: services/agent/Dockerfile
+          push: true
+          platforms: linux/arm64
+          tags: |
+            ghcr.io/priyo13o4/robincalls-agent:latest
+            ghcr.io/priyo13o4/robincalls-agent:${{ github.sha }}
+          cache-from: type=gha,scope=agent
+          cache-to: type=gha,mode=max,scope=agent
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # Base stack only. The Goldsky Mirror landing DB (docker-compose.goldsky.yml,
+      # postgres-index + pgbouncer-index) was RETIRED 2026-08-01 — the pipeline is
+      # not used and its ops overhead was not worth carrying, so the overlay is
+      # gone and must not be re-added here. Those two containers ran
+      # `restart: unless-stopped`, so composing the overlay is what kept
+      # resurrecting them on every deploy and reboot. Reads were always
+      # flag-gated (GOLDSKY_INDEX_READS_ENABLED, never enabled) and fall back to
+      # the explorer, so dropping it changes no verdict.
+      #
+      # The deploy itself is scripts/deploy-remote.sh — pulled by the `git pull`
+      # on the line below, so it is always the version that was just merged.
+      # Rollout ordering, the nginx --force-recreate, and the health gates all
+      # live there, in reviewable shell rather than inside three levels of
+      # quoting.
+      - name: Prepare SSM parameters
+        run: |
+          cat << 'EOF' > params.json
+          {
+            "command": [
+              "sh -c \"cd /home/admin/robincalls && git pull origin main && sh scripts/deploy-remote.sh\""
+            ]
+          }
+          EOF
+
+      # `aws ssm start-session` exits 0 once the SESSION is established and
+      # never propagates the remote shell's exit status — a crash-looping agent
+      # or a 401 on `docker compose pull` produced a green deploy. The
+      # non-interactive document gives us the remote stdout and nothing else, so
+      # the remote script's final line is the signal: it is `set -e`, so
+      # RC_DEPLOY_OK is printed only if every step and both health gates passed.
+      #
+      # `send-command` would carry a real status, but it needs ssm:SendCommand
+      # on the OIDC role, which this one does not have. Grep first; widen the
+      # IAM policy later if it is worth a round trip.
+      - name: Deploy to EC2 via SSM
+        run: |
+          sudo apt-get update && sudo apt-get install -y expect
+          set -o pipefail
+          unbuffer aws ssm start-session \
+            --target "${{ vars.EC2_INSTANCE_ID }}" \
+            --document-name AWS-StartNonInteractiveCommand \
+            --parameters file://params.json | tee deploy.log
+          if ! grep -q 'RC_DEPLOY_OK' deploy.log; then
+            echo "::error::The remote deploy did not report success — see the output above."
+            exit 1
+          fi

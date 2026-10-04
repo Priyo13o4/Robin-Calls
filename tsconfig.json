@@ -1,0 +1,44 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "**/*.mts"
+  ],
+  "//exclude": [
+    "Scoped to what Next actually compiles. `include` is **/*.ts, so the dev",
+    "server's background typechecker was walking 269 test files, 6 scripts and",
+    "5 scrapers on startup and on every edit — none of which Next ever bundles.",
+    "",
+    "These files are STILL TYPECHECKED, by tsconfig.test.json via `npm run",
+    "typecheck`. Dropping them from the gate would be a real loss: `npm run",
+    "test` runs tsx, which strips types without checking them, so a type error",
+    "in a test would otherwise reach nobody."
+  ],
+  "exclude": ["node_modules", "tests", "scripts", "scrape-wallets"]
+}

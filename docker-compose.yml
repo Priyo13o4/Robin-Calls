@@ -1,0 +1,361 @@
+name: robincalls
+
+services:
+  postgres:
+    build:
+      # Repo root, not ./docker/postgres — matches how the app's own
+      # Dockerfile context works, kept consistent even though this Dockerfile
+      # no longer COPYs anything repo-relative.
+      context: .
+      dockerfile: docker/postgres/Dockerfile
+    restart: unless-stopped
+    # shared_preload_libraries requires a server restart to take effect and
+    # can't be set via CREATE EXTENSION — passed here rather than baked into
+    # the image so cron.database_name always tracks POSTGRES_DB.
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_cron
+      - -c
+      - cron.database_name=${POSTGRES_DB:-robincalls}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-robincalls}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.production}
+    volumes:
+      # Bind mount to a real host path, deliberately NOT a named Docker
+      # volume — `docker compose down -v`, `docker volume rm`, and `docker
+      # system prune --volumes` all wipe named volumes without much
+      # ceremony, and an opaque volume hash under /var/lib/docker/volumes/
+      # doesn't look important until it's gone. A host path is visible in
+      # `ls`, survives every one of those commands (they only ever touch
+      # volumes, never bind mounts), and is trivial to back up with `tar`/
+      # `rsync`/a snapshot of the underlying disk. Point POSTGRES_DATA_DIR
+      # at a separate disk/mount if you have one — defaults to a repo-local
+      # ./data/postgres otherwise.
+      #
+      # Mount target is /var/lib/postgresql (NOT .../data) — the official
+      # image changed its on-disk layout starting at PG18: it now expects one
+      # mount at /var/lib/postgresql and stores data itself in a version-
+      # namespaced subdirectory underneath, for pg_ctlcluster/pg_upgrade
+      # compatibility. Mounting at the old .../data path makes the image
+      # refuse to start ("PostgreSQL data in /var/lib/postgresql/data
+      # (unused mount/volume)") — confirmed by actually booting this.
+      - ${POSTGRES_DATA_DIR:-./data/postgres}:/var/lib/postgresql
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-robincalls}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # No ports: exposed — only pgbouncer and the migration step reach this
+    # directly, over the internal network. Never bind this to the host.
+
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.25.2-p0
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./docker/pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./docker/pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+    networks:
+      - internal
+    # No ports: exposed — only `app` connects, over the internal network.
+    # Host access for local tooling (scripts/create-admin.ts) belongs in
+    # docker-compose.local.yml, loopback-bound. It must NEVER be published
+    # from this base file: this is the file the VPS runs, and a bare
+    # "6432:6432" binds 0.0.0.0 — the connection pooler, and through it the
+    # whole database, reachable from the public internet.
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    command: ["valkey-server", "--appendonly", "yes"]
+    volumes:
+      - valkey-data:/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    image: ghcr.io/priyo13o4/robincalls:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      pgbouncer:
+        condition: service_started
+      valkey:
+        condition: service_healthy
+      relay:
+        condition: service_started
+    env_file:
+      - .env.production
+    environment:
+      # Points at pgbouncer's port (6432), never straight at postgres (5432).
+      DATABASE_URL: postgresql://robincalls_app:${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env.production}@pgbouncer:6432/robincalls
+      REDIS_URL: redis://valkey:6379
+      # Which build is talking, on every error row (KNOWN-PROBLEMS F3a). Exported
+      # by scripts/deploy-remote.sh; `unknown` is honest for a hand-started
+      # container, and is NOT null — null meant "the field never worked".
+      APP_GIT_SHA: ${APP_GIT_SHA:-unknown}
+      WS_FEED_URL: ${WS_FEED_URL:-ws://relay:9642}
+    volumes:
+      # Read-only mount of nginx analytics logs for the ingest job.
+      - nginx_logs:/var/log/nginx:ro
+      # The client-chunk archive. This is what survives a container swap — see
+      # the volume's own comment at the bottom of this file, and
+      # docker/app/entrypoint.sh, which merges each build into it on start.
+      - next_static:/app/.next/static
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/stats').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    # No ports: exposed — only nginx reaches it, over the internal network.
+
+  agent:
+    image: ghcr.io/priyo13o4/robincalls-agent:${AGENT_IMAGE_TAG:-${IMAGE_TAG:-latest}}
+    restart: unless-stopped
+    depends_on:
+      app:
+        # service_started, not service_healthy. The agent's own startup gate
+        # calls Next for get_methodology and refuses to boot if that fails, so
+        # it already handles Next being down — and waiting on `app` healthy
+        # would serialise every deploy behind a full Next boot for no gain.
+        condition: service_started
+    # NO env_file here, and that is the whole point. `env_file:` loads the
+    # entire file; `environment:` only overrides the keys it names. Carrying
+    # both meant the two lines below withheld nothing — `docker compose config`
+    # rendered this container with ~105 variables including DATABASE_URL,
+    # RPC_ENDPOINTS_JSON (an Alchemy key in a URL path, a Goldsky ?secret=),
+    # BETTER_AUTH_SECRET, ADMIN_PASSWORD, POSTGRES_PASSWORD and
+    # CLOUDFLARE_TUNNEL_TOKEN. settings.py uses extra="ignore", so nothing
+    # inside the process could see it, and this is the one container that
+    # ingests model output and exposes a public JSON-RPC surface.
+    #
+    # So the list is explicit: if a variable is not named here the agent does
+    # not have it. Two forms are in use —
+    #   KEY: ${KEY:?…}  reads .env.production via the deploy's --env-file, and
+    #                   refuses the deploy when unset OR blank.
+    #   KEY:            passes through from the environment compose runs in,
+    #                   and is simply absent when unset, so settings.py's own
+    #                   default applies. Never `${KEY:-}` for these: that
+    #                   passes an empty string, which overrides the default
+    #                   with "" and fails outright on an int-typed setting.
+    environment:
+      # ── Required. Blank is a deploy-time refusal, not a crash loop. ────────
+      INTERNAL_JOB_SECRET: ${INTERNAL_JOB_SECRET:?set INTERNAL_JOB_SECRET in .env.production}
+      # Generate once with openssl rand -hex 32. Required here even while
+      # ENABLE_MCP is off, and deliberately: the agent refuses to boot in
+      # production if the surface is enabled without a token, so making the
+      # token a prerequisite of the deploy means flipping the flag later is a
+      # one-line change that cannot turn into a crash loop. As a bare
+      # env_file inheritance of the blank line in .env.example, that is exactly
+      # what it was — looping forever under a green deploy.
+      MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN:?set MCP_AUTH_TOKEN in .env.production}
+
+      # ── Fixed by the topology, not by configuration. ──────────────────────
+      # The agent NEVER gets DATABASE_URL or RPC_ENDPOINTS_JSON. It has no
+      # database access by design (domain tables belong to lib/data/) and no
+      # RPC pool of its own — circuit state is per-process, so a second pool
+      # would give two blind views of the same providers. Everything it needs
+      # goes through the internal contract on `app`.
+      NEXT_INTERNAL_BASE_URL: http://app:3000
+      AGENT_ENV: production
+
+      # ── Optional. Absent means settings.py decides. ───────────────────────
+      # The /mcp kill switch. Absent = OFF = 404, which is the state K1 asks
+      # for until per-caller identity and quota exist.
+      ENABLE_MCP:
+      # Keyless and browser-facing; validated for credential shapes at import.
+      PUBLIC_CLIENT_RPC_URLS:
+      CLIENT_RPC_MAX_BLOCK_LAG:
+      # Where a client-side contract audit fetches verified source. This is the
+      # FREE community Blockscout, and it is a different variable from the
+      # scanner's EXPLORER_API_URL on purpose: that one points at the PRO
+      # gateway (api.blockscout.com/4663) and is paired with EXPLORER_API_KEY.
+      #
+      # Note what protects us here, because `assert_keyless` does NOT: the PRO
+      # gateway carries its key in a HEADER, not in the URL, so its URL passes
+      # every credential-shape check cleanly. What makes the mistake impossible
+      # is this list — EXPLORER_API_URL and EXPLORER_API_KEY are not on it, so
+      # the agent process cannot see our paid explorer at all and cannot serve
+      # it to a browser even by accident.
+      PUBLIC_EXPLORER_API_URL:
+      # Ceiling for client- and local-locale reads, which cost us nothing —
+      # separate from AGENT_MAX_TOOL_CALLS above, which meters OUR pool. A live
+      # contract audit is a dozen browser reads and would exhaust the server
+      # budget it never actually charges.
+      AGENT_MAX_FREE_TOOL_CALLS:
+      # Our-models only. BYOK keys never reach this process. Setting EITHER of
+      # these before metering exists is refused at boot — the guard is on
+      # `our_models_enabled`, not on one named key, so a second provider cannot
+      # walk past it (see METERING_IMPLEMENTED).
+      ANTHROPIC_API_KEY:
+      GEMINI_API_KEY:
+      # anthropic | gemini. Absent = inferred from whichever key is set, which
+      # is only ambiguous when both are — hence the explicit override.
+      AGENT_PROVIDER:
+      # Absent = the selected provider's default. Never share one value across
+      # providers: `claude-sonnet-5` sent to Gemini is a 404 at request time.
+      AGENT_MODEL:
+      AGENT_MAX_OUTPUT_TOKENS:
+      AGENT_MODEL_TIMEOUT_S:
+      AGENT_MAX_TOOL_CALLS:
+      AGENT_MAX_HISTORY_TOKENS:
+      AGENT_NEXT_READ_TIMEOUT_S:
+      AGENT_NEXT_SCAN_TIMEOUT_S:
+      # The cold-start escape hatch. Set to 1 only to break a deadlock where
+      # the agent cannot verify check coverage because `app` is not up yet.
+      AGENT_SKIP_COVERAGE_GATE:
+      LOG_LEVEL:
+    networks:
+      - internal
+    healthcheck:
+      # Liveness only. /health/ready would fail while Next restarts, and
+      # restarting the agent cannot fix Next — one outage would become two.
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status==200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    # No ports: exposed — only nginx reaches it, over the internal network.
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+      agent:
+        condition: service_started
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - nginx_logs:/var/log/nginx
+    networks:
+      - internal
+    # No host port published either — cloudflared reaches nginx by service
+    # name over the internal network; nothing on this stack binds to the
+    # VPS's public interface at all. That's the whole point of the tunnel.
+
+  # Rotates docker/nginx/nginx.conf's analytics_json log without a custom
+  # nginx image or Docker-socket access (both ruled out — see AGENTS.md
+  # "no security theatre"). `pid: service:nginx` puts this container in
+  # nginx's PID namespace so `kill -USR1 1` reaches its master directly.
+  # nginx's own reopen semantics do the hard part: on USR1 it opens a fresh
+  # `analytics.log` at the configured path and only then closes the fd still
+  # writing to the renamed file, so nothing written in between the mv and the
+  # signal is lost. app/api/jobs/analytics-ingest drains that renamed file
+  # down to `.1` before it ever reads the new one.
+  nginx-logrotate:
+    image: alpine:3.20
+    restart: unless-stopped
+    pid: "service:nginx"
+    depends_on:
+      nginx:
+        condition: service_started
+    volumes:
+      - nginx_logs:/var/log/nginx
+    environment:
+      # ~1 month of log growth at the PRD's own 10-15MB/day estimate.
+      ROTATE_AT_BYTES: ${ANALYTICS_LOG_ROTATE_THRESHOLD_BYTES:-33554432}
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -eu
+        LOG=/var/log/nginx/analytics.log
+        while true; do
+          sleep 900
+          if [ -f "$$LOG" ]; then
+            size=$$(stat -c%s "$$LOG" 2>/dev/null || echo 0)
+            if [ "$$size" -ge "$$ROTATE_AT_BYTES" ]; then
+              # Overwriting a not-yet-drained .1 would lose data — leave it
+              # for the ingest job to catch up rather than compounding the gap.
+              if [ ! -e "$$LOG.1" ]; then
+                mv "$$LOG" "$$LOG.1"
+                kill -USR1 1
+              fi
+            fi
+          fi
+        done
+    networks:
+      - internal
+
+  # Arbitrum Nitro Sequencer Relay sidecar.
+  # Connects upstream to Robinhood Chain's sequencer WebSocket feed and exposes
+  # a clean local feed on port 9642 over the internal network with 0 disk writes.
+  relay:
+    image: offchainlabs/nitro-node:v3.11.4-7d5ac27-slim
+    restart: unless-stopped
+    command:
+      - --chain.id=4663
+      - --node.feed.output.enable
+      - --node.feed.input.url=${SEQUENCER_FEED_URL:-wss://feed.mainnet.chain.robinhood.com}
+      - --node.feed.output.addr=0.0.0.0
+      - --node.feed.output.port=9642
+      # Keep reconnect frames below the consumer's bounded payload/queue budgets.
+      - --node.feed.output.backlog.segment-limit=16
+      - --node.feed.output.write-timeout=10s
+    entrypoint: relay
+    networks:
+      - internal
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    # Remotely managed tunnel: public-hostname ingress rules live in the
+    # Cloudflare Zero Trust dashboard, not in a config.yml mounted here.
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN in .env.production}
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN in .env.production}
+    depends_on:
+      - nginx
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  # Valkey only — short-TTL rate-limit counters and scan locks/cache, all
+  # self-healing and safe to lose. Postgres data is a host bind mount above
+  # instead (see the postgres service's `volumes:` comment) — the one thing
+  # you actually can't afford to nuke by accident.
+  valkey-data:
+  # Shared buffer for nginx analytics logs. Nginx writes JSON access logs here;
+  # the app container mounts it read-only and a pg_cron job ingests them into
+  # Postgres rollup tables. Safe to lose — the ingest cursor in the DB tracks
+  # position, and missed lines just mean a gap in the dashboard, not a bug.
+  # The nginx-logrotate sidecar keeps this volume bounded (rename + `.1` drain
+  # by the ingest job, not size-unbounded growth — see that service's comment).
+  nginx_logs:
+  # Next's client chunks, kept across deploys.
+  #
+  # `.next/static` used to live only inside the image, so replacing the app
+  # container deleted every chunk the previous build had emitted. Any tab open
+  # across a deploy then requested a hash that no longer existed and got a 404
+  # — the "some pages fail to load, a reload fixes it" report. Serving the old
+  # build's assets alongside the new one is the actual fix; the reload handler
+  # in app/layout.tsx is now only the backstop for a tab older than the sweep
+  # window below.
+  #
+  # Named, not a bind mount, and that is the right way round here: unlike the
+  # Postgres data above, losing this costs nothing. A fresh volume is refilled
+  # by the very next container start, and the only casualty is mid-deploy tabs
+  # from builds that are already gone.
+  #
+  # Bounded by an age sweep in the entrypoint (NEXT_STATIC_RETENTION_DAYS,
+  # default 14), so it does not grow one build's worth of assets per deploy
+  # forever.
+  next_static:
